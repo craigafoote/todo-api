@@ -1,13 +1,15 @@
 var express = require('express');
+var bodyParser = require('body-parser');
 var _ = require('underscore');
+var db = require('./db.js');
+
 var app = express();
 var PORT = process.env.PORT || 3000;
 var todos = [];
 var todoNextId = 1;
-var bodyParser = require('body-parser');
-var db = require('./db.js');
 
 app.use(bodyParser.json());
+
 
 app.get('/', function(req,res){
 	res.send('Todo API Root');
@@ -51,7 +53,10 @@ app.get('/todos/:id',function(req, res){
 });
 
 app.post('/todos', function(req, res){
-	var body = _.pick(req.body, 'description','completed'); 
+//	var body = _.pick(req.body, 'description','completed'); 
+    var body = req.body;
+    console.log("logging");
+    console.log(body);
 
 	db.todo.create(body).then(function(todo){
 	 		res.json(todo.toJSON());
@@ -74,14 +79,21 @@ app.post('/todos', function(req, res){
 
 app.delete('/todos/:id', function(req, res){
 	var todoId = parseInt(req.params.id, 10);
-	var matchedToDo = _.findWhere(todos, {id: todoId});
-
-	if(matchedToDo){
-		todos = _.without(todos, matchedToDo);
-		res.json(matchedToDo);
-	} else {
-		res.status(404).json({"error" : "no todo found with that id"});		
-	}
+	db.todo.destroy({
+		where: {
+			id: todoId
+		}
+	}).then(function(rowsDeleted){
+		if(rowsDeleted === 0){
+			res.status(404).send({
+				error: 'No todo with id'
+			});
+		} else {
+			res.status(204).send();
+		}
+	}, function(){
+		res.status(500).send();
+	})
 });
 
 app.put('/todos/:id', function(req, res){
@@ -111,7 +123,7 @@ app.put('/todos/:id', function(req, res){
 	res.json(matchedToDo);
 });
 
-db.sequelize.sync({force: true}).then(function(){
+db.sequelize.sync().then(function(){
 	app.listen(PORT, function(){
 		console.log("Express listening on port " + PORT);
 	});	
